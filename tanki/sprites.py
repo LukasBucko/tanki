@@ -27,58 +27,44 @@ class Bullet(pygame.sprite.Sprite):
         self.max_bounces = 3
 
     def update(self):
-        # --- Pohyb na osi X ---
+        # Pohyb na osi X
         self.pos.x += self.velocity.x
         self.rect.centerx = self.pos.x
-
-        # Kontrola kolízie s každou stenou
         for wall in self.wall_group:
             if self.rect.colliderect(wall.rect):
-                # Odraz od VERTIKÁLNEJ steny (boky stien)
-                if self.velocity.x > 0:  # Letí doprava, narazí do ľavej strany steny
-                    self.rect.right = wall.rect.left
-                elif self.velocity.x < 0:  # Letí doľava, narazí do pravej strany steny
-                    self.rect.left = wall.rect.right
-
+                if self.velocity.x > 0: self.rect.right = wall.rect.left
+                elif self.velocity.x < 0: self.rect.left = wall.rect.right
                 self.velocity.x *= -1
                 self.pos.x = self.rect.centerx
                 self.bounces += 1
-                break  # Zastavíme kontrolu po prvej kolízii v tomto framu
+                break
 
-        # --- Pohyb na osi Y ---
+        # Pohyb na osi Y
         self.pos.y += self.velocity.y
         self.rect.centery = self.pos.y
-
         for wall in self.wall_group:
             if self.rect.colliderect(wall.rect):
-                # Odraz od HORIZONTÁLNEJ steny (vrch/spodok stien)
-                if self.velocity.y > 0:  # Letí dole, narazí na vrch steny
-                    self.rect.bottom = wall.rect.top
-                elif self.velocity.y < 0:  # Letí hore, narazí na spodok steny
-                    self.rect.top = wall.rect.bottom
-
+                if self.velocity.y > 0: self.rect.bottom = wall.rect.top
+                elif self.velocity.y < 0: self.rect.top = wall.rect.bottom
                 self.velocity.y *= -1
                 self.pos.y = self.rect.centery
                 self.bounces += 1
                 break
 
-        # Aktualizácia finálnej pozície
         self.rect.center = self.pos
-
-        # Zničenie strely pri vyletení z obrazovky alebo po max odrazoch
-        if not (
-                0 <= self.pos.x <= constants.WIDTH and 0 <= self.pos.y <= constants.HEIGHT) or self.bounces > self.max_bounces:
+        if not (0 <= self.pos.x <= constants.WIDTH and 0 <= self.pos.y <= constants.HEIGHT) or self.bounces > self.max_bounces:
             self.kill()
 
 
 class Tank(pygame.sprite.Sprite):
-    def __init__(self, x, y, color, controls, bullet_group, wall_group, lives=None):
+    def __init__(self, x, y, color, controls, bullet_group, wall_group, shoot_sound=None, lives=None):
         super().__init__()
         self.color = color
         self.lives = lives if lives is not None else constants.tank_lives
         self.bullet_group = bullet_group
         self.wall_group = wall_group
         self.controls = controls
+        self.shoot_sound = shoot_sound
         self.cooldown_tracker = 0
 
         self.original_image = pygame.Surface((44, 44), pygame.SRCALPHA)
@@ -90,36 +76,33 @@ class Tank(pygame.sprite.Sprite):
 
         self.image = self.original_image
         self.rect = self.image.get_rect(center=(x, y))
-
         self.hitbox = pygame.Rect(0, 0, 26, 26)
         self.hitbox.center = (x, y)
-
         self.pos = pygame.math.Vector2(x, y)
         self.angle = 0
 
     def shoot(self):
         if self.cooldown_tracker == 0:
-            # Výpočet offsetu, aby strela nezačínala presne v strede tanku (menej samovrážd)
+            # Prehraj zvuk výstrelu
+            if self.shoot_sound:
+                self.shoot_sound.play()
+
             direction = pygame.math.Vector2(1, 0).rotate(-self.angle)
             spawn_pos = self.pos + direction * 25
-
             new_bullet = Bullet(spawn_pos.x, spawn_pos.y, self.angle, self, self.wall_group)
             self.bullet_group.add(new_bullet)
             self.cooldown_tracker = constants.SHOOT_COOLDOWN
 
     def update(self):
         keys = pygame.key.get_pressed()
-
         if keys[self.controls['left']]: self.angle += 3.5
         if keys[self.controls['right']]: self.angle -= 3.5
 
         direction = pygame.math.Vector2(1, 0).rotate(-self.angle)
         move_vec = pygame.math.Vector2(0, 0)
-
         if keys[self.controls['up']]: move_vec = direction * constants.tank_speed
         if keys[self.controls['down']]: move_vec = -direction * constants.tank_speed
 
-        # X pohyb a kolízie
         if move_vec.x != 0:
             self.pos.x += move_vec.x
             self.hitbox.centerx = self.pos.x
@@ -129,7 +112,6 @@ class Tank(pygame.sprite.Sprite):
                     if move_vec.x < 0: self.hitbox.left = wall.rect.right
                     self.pos.x = self.hitbox.centerx
 
-        # Y pohyb a kolízie
         if move_vec.y != 0:
             self.pos.y += move_vec.y
             self.hitbox.centery = self.pos.y
@@ -141,6 +123,5 @@ class Tank(pygame.sprite.Sprite):
 
         self.image = pygame.transform.rotate(self.original_image, self.angle)
         self.rect = self.image.get_rect(center=self.pos)
-
         if keys[self.controls['shoot']]: self.shoot()
         if self.cooldown_tracker > 0: self.cooldown_tracker -= 1

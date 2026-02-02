@@ -1,6 +1,7 @@
 import pygame
 import sys
 import random
+import os
 import tanki.constants as constants
 from tanki.ui import UI
 from tanki.sprites import Tank, Wall
@@ -9,10 +10,29 @@ from tanki.sprites import Tank, Wall
 class GameEngine:
     def __init__(self):
         pygame.init()
+        pygame.mixer.init()
+
         self.screen = pygame.display.set_mode((constants.WIDTH, constants.HEIGHT))
         pygame.display.set_caption("TANKI")
         self.clock = pygame.time.Clock()
         self.ui = UI(self.screen)
+
+        # --- OPRAVA CIEST K ASSETOM ---
+        # Zistíme cestu k priečinku, kde je tento súbor (game_engine.py)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # Priečinok assets je o úroveň vyššie (v root priečinku projektu)
+        project_root = os.path.dirname(current_dir)
+        assets_path = os.path.join(project_root, "assets")
+
+        # Načítanie zvukových efektov
+        try:
+            self.shoot_sound = pygame.mixer.Sound(os.path.join(assets_path, "shoot.mp3"))
+            self.hit_sound = pygame.mixer.Sound(os.path.join(assets_path, "hit.mp3"))
+            self.shoot_sound.set_volume(0.3)
+            self.hit_sound.set_volume(0.5)
+        except:
+                self.shoot_sound = None
+                self.hit_sound = None
 
         self.tanks = pygame.sprite.Group()
         self.bullets = pygame.sprite.Group()
@@ -48,14 +68,15 @@ class GameEngine:
         self.setup_map()
 
         ts = constants.TILE_SIZE
+        # Odovzdáme shoot_sound tankom
         p1 = Tank(ts * 1.5, ts * 1.5, constants.GREEN, {
             'up': pygame.K_w, 'down': pygame.K_s, 'left': pygame.K_a, 'right': pygame.K_d, 'shoot': pygame.K_SPACE
-        }, self.bullets, self.walls, lives=constants.tank_lives)
+        }, self.bullets, self.walls, shoot_sound=self.shoot_sound, lives=constants.tank_lives)
 
         p2 = Tank(ts * 8.5, ts * 5.5, constants.RED, {
             'up': pygame.K_UP, 'down': pygame.K_DOWN, 'left': pygame.K_LEFT, 'right': pygame.K_RIGHT,
             'shoot': pygame.K_RSHIFT
-        }, self.bullets, self.walls, lives=constants.tank_lives)
+        }, self.bullets, self.walls, shoot_sound=self.shoot_sound, lives=constants.tank_lives)
 
         self.tanks.add(p1, p2)
 
@@ -110,31 +131,30 @@ class GameEngine:
             elif self.state == constants.PLAYING:
                 self.screen.fill(constants.GRAY)
 
-                # --- AKTUALIZÁCIA ---
                 self.tanks.update()
                 self.bullets.update()
 
-                # --- LOGIKA KOLÍZIÍ (STRELY VS TANKY) ---
+                # LOGIKA KOLÍZIÍ (STRELY VS TANKY) + ZVUK ZÁSAHU
                 for bullet in self.bullets:
-                    # Skontrolujeme, či strela trafila nejaký tank
                     hit_tanks = pygame.sprite.spritecollide(bullet, self.tanks, False)
                     for tank in hit_tanks:
-                        # Ak je to cudzí tank ALEBO tvoj vlastný po odraze (bounces > 0)
                         if bullet.owner != tank or getattr(bullet, 'bounces', 0) > 0:
+                            # Prehraj zvuk zásahu
+                            if self.hit_sound:
+                                self.hit_sound.play()
+
                             tank.lives -= 1
                             bullet.kill()
                             if tank.lives <= 0:
                                 tank.kill()
-                            break  # Strela zmizne hneď po prvom zásahu
+                            break
 
-                # --- VYKRESLENIE ---
                 self.walls.draw(self.screen)
                 self.bullets.draw(self.screen)
                 self.tanks.draw(self.screen)
 
-                # --- HUD (Životy) ---
+                # HUD
                 tanks_list = self.tanks.sprites()
-                # Bezpečné získanie tankov podľa farby
                 p1 = next((t for t in tanks_list if t.color == constants.GREEN), None)
                 p2 = next((t for t in tanks_list if t.color == constants.RED), None)
 
@@ -145,19 +165,15 @@ class GameEngine:
                     p2_lives = self.ui.font_info.render(f"P2 HP: {p2.lives}", True, constants.RED)
                     self.screen.blit(p2_lives, (constants.WIDTH - p2_lives.get_width() - 20, 20))
 
-                # Detekcia konca kola
                 if len(self.tanks) < 2:
-                    # Vykreslenie výsledku predtým, než hra zamrzne na delay
                     msg = "REMIZA!"
                     if p1:
                         msg = "P1 VYHRAL!"
                     elif p2:
                         msg = "P2 VYHRAL!"
-
                     self.ui.draw_text(msg, self.ui.font_title, constants.YELLOW, constants.WIDTH // 2,
                                       constants.HEIGHT // 2)
                     pygame.display.flip()
-
                     pygame.time.delay(1500)
                     self.start_game()
 
