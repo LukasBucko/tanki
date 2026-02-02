@@ -20,3 +20,6 @@ tank_lives = 3
 
 player1_lives = tank_lives  #P1
 player2_lives = tank_lives  #P2
+
+BULLET_SPEED = 5
+SHOOT_COOLDOWN = 30

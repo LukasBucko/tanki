@@ -14,7 +14,10 @@ class GameEngine:
         self.clock = pygame.time.Clock()
 
         self.ui = UI(self.screen)
+
+        # Skupiny spritov
         self.tanks = pygame.sprite.Group()
+        self.bullets = pygame.sprite.Group()  # Pridaná skupina pre strely
 
         # Predvolený stav
         self.state = constants.MENU
@@ -22,22 +25,25 @@ class GameEngine:
 
     def start_game(self):
         self.tanks.empty()
+        self.bullets.empty()  # Vyčistíme strely pri novom štarte
 
-        # Hráč 1
+        # Hráč 1 - Pridaný 'shoot': SPACE a odkaz na skupinu striel
         p1 = Tank(200, 300, constants.GREEN, {
             'up': pygame.K_w,
             'down': pygame.K_s,
             'left': pygame.K_a,
-            'right': pygame.K_d
-        }, lives=constants.tank_lives)
+            'right': pygame.K_d,
+            'shoot': pygame.K_SPACE
+        }, self.bullets, lives=constants.tank_lives)
 
-        # Hráč 2
+        # Hráč 2 - Pridaný 'shoot': RETURN (Enter) a odkaz na skupinu striel
         p2 = Tank(600, 300, constants.RED, {
             'up': pygame.K_UP,
             'down': pygame.K_DOWN,
             'left': pygame.K_LEFT,
-            'right': pygame.K_RIGHT
-        }, lives=constants.tank_lives)
+            'right': pygame.K_RIGHT,
+            'shoot': pygame.K_RETURN
+        }, self.bullets, lives=constants.tank_lives)
 
         self.tanks.add(p1, p2)
 
@@ -102,9 +108,13 @@ class GameEngine:
             elif self.state == constants.PLAYING:
                 self.screen.fill(constants.GRAY)
 
-                # Aktualizácia a vykreslenie tankov
+                # --- AKTUALIZÁCIA ---
                 self.tanks.update()
+                self.bullets.update()  # Aktualizujeme pohyb striel
+
+                # --- VYKRESLENIE ---
                 self.tanks.draw(self.screen)
+                self.bullets.draw(self.screen)  # Vykreslíme strely na obrazovku
 
                 # --- ZOBRAZENIE ŽIVOTOV V ROHOCH ---
                 tanks_list = self.tanks.sprites()
