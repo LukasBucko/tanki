@@ -27,14 +27,12 @@ class GameEngine:
         thick = 2
         ts = constants.TILE_SIZE
 
-        # Výber náhodnej mapy zo zoznamu piatich máp
         self.current_map_matrix = random.choice(constants.MAPS)
 
         for r, row in enumerate(self.current_map_matrix):
             for c, cell in enumerate(row):
                 if cell == 1:
                     x, y = c * ts, r * ts
-                    # Kreslíme čiary len tam, kde stena susedí s prázdnym priestorom (0)
                     if r > 0 and self.current_map_matrix[r - 1][c] == 0:
                         self.walls.add(Wall(x, y, ts, thick))
                     if r < len(self.current_map_matrix) - 1 and self.current_map_matrix[r + 1][c] == 0:
@@ -45,21 +43,18 @@ class GameEngine:
                         self.walls.add(Wall(x + ts - thick, y, thick, ts))
 
     def start_game(self):
-        """Inicializuje kolo, mapu a tanky s ohľadom na nastavené životy."""
         self.tanks.empty()
         self.bullets.empty()
         self.setup_map()
 
         ts = constants.TILE_SIZE
-        # Hráč 1 - Spawn vľavo hore (bezpečná zóna 1,1)
         p1 = Tank(ts * 1.5, ts * 1.5, constants.GREEN, {
             'up': pygame.K_w, 'down': pygame.K_s, 'left': pygame.K_a, 'right': pygame.K_d, 'shoot': pygame.K_SPACE
         }, self.bullets, self.walls, lives=constants.tank_lives)
 
-        # Hráč 2 - Spawn vpravo dole (bezpečná zóna 8,5)
         p2 = Tank(ts * 8.5, ts * 5.5, constants.RED, {
             'up': pygame.K_UP, 'down': pygame.K_DOWN, 'left': pygame.K_LEFT, 'right': pygame.K_RIGHT,
-            'shoot': pygame.K_RETURN
+            'shoot': pygame.K_RSHIFT
         }, self.bullets, self.walls, lives=constants.tank_lives)
 
         self.tanks.add(p1, p2)
@@ -69,7 +64,6 @@ class GameEngine:
             if event.type == pygame.QUIT:
                 self.running = False
 
-            # --- Logika pre MENU ---
             if self.state == constants.MENU:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_UP:
@@ -86,7 +80,6 @@ class GameEngine:
                         elif self.ui.selected_index == 2:
                             self.running = False
 
-            # --- Logika pre SETTINGS ---
             elif self.state == constants.SETTINGS:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_UP:
@@ -94,10 +87,10 @@ class GameEngine:
                     elif event.key == pygame.K_DOWN:
                         self.ui.selected_index = (self.ui.selected_index + 1) % 3
 
-                    if self.ui.selected_index == 0:  # Rýchlosť
+                    if self.ui.selected_index == 0:
                         if event.key == pygame.K_RIGHT: constants.tank_speed = min(5, constants.tank_speed + 1)
                         if event.key == pygame.K_LEFT: constants.tank_speed = max(1, constants.tank_speed - 1)
-                    elif self.ui.selected_index == 1:  # Životy
+                    elif self.ui.selected_index == 1:
                         if event.key == pygame.K_RIGHT: constants.tank_lives = min(5, constants.tank_lives + 1)
                         if event.key == pygame.K_LEFT: constants.tank_lives = max(1, constants.tank_lives - 1)
                     elif event.key == pygame.K_RETURN and self.ui.selected_index == 2:
@@ -121,6 +114,19 @@ class GameEngine:
                 self.tanks.update()
                 self.bullets.update()
 
+                # --- LOGIKA KOLÍZIÍ (STRELY VS TANKY) ---
+                for bullet in self.bullets:
+                    # Skontrolujeme, či strela trafila nejaký tank
+                    hit_tanks = pygame.sprite.spritecollide(bullet, self.tanks, False)
+                    for tank in hit_tanks:
+                        # Ak je to cudzí tank ALEBO tvoj vlastný po odraze (bounces > 0)
+                        if bullet.owner != tank or getattr(bullet, 'bounces', 0) > 0:
+                            tank.lives -= 1
+                            bullet.kill()
+                            if tank.lives <= 0:
+                                tank.kill()
+                            break  # Strela zmizne hneď po prvom zásahu
+
                 # --- VYKRESLENIE ---
                 self.walls.draw(self.screen)
                 self.bullets.draw(self.screen)
@@ -128,18 +134,33 @@ class GameEngine:
 
                 # --- HUD (Životy) ---
                 tanks_list = self.tanks.sprites()
-                if len(tanks_list) >= 2:
-                    p1_lives = self.ui.font_info.render(f"P1 HP: {tanks_list[0].lives}", True, constants.GREEN)
+                # Bezpečné získanie tankov podľa farby
+                p1 = next((t for t in tanks_list if t.color == constants.GREEN), None)
+                p2 = next((t for t in tanks_list if t.color == constants.RED), None)
+
+                if p1:
+                    p1_lives = self.ui.font_info.render(f"P1 HP: {p1.lives}", True, constants.GREEN)
                     self.screen.blit(p1_lives, (20, 20))
-                    p2_lives = self.ui.font_info.render(f"P2 HP: {tanks_list[1].lives}", True, constants.RED)
+                if p2:
+                    p2_lives = self.ui.font_info.render(f"P2 HP: {p2.lives}", True, constants.RED)
                     self.screen.blit(p2_lives, (constants.WIDTH - p2_lives.get_width() - 20, 20))
 
-                # Detekcia konca kola (ak jeden hráč vyhrá)
+                # Detekcia konca kola
                 if len(self.tanks) < 2:
-                    pygame.time.delay(1000)
+                    # Vykreslenie výsledku predtým, než hra zamrzne na delay
+                    msg = "REMIZA!"
+                    if p1:
+                        msg = "P1 VYHRAL!"
+                    elif p2:
+                        msg = "P2 VYHRAL!"
+
+                    self.ui.draw_text(msg, self.ui.font_title, constants.YELLOW, constants.WIDTH // 2,
+                                      constants.HEIGHT // 2)
+                    pygame.display.flip()
+
+                    pygame.time.delay(1500)
                     self.start_game()
 
-                # ESC pre návrat do menu
                 if pygame.key.get_pressed()[pygame.K_ESCAPE]:
                     self.state = constants.MENU
 
