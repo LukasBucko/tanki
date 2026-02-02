@@ -1,0 +1,6 @@
+[project]
+name = "tanki"
+version = "0.0.1"
+dependencies = [
+    "pygame>=2.5.0",
+]
