@@ -15,5 +15,8 @@ SETTINGS = "SETTINGS"
 PLAYING = "PLAYING"
 GAME_OVER = "GAME_OVER"
 
-tank_speed = 3
+tank_speed = 1
 tank_lives = 3
+
+player1_lives = tank_lives  #P1
+player2_lives = tank_lives  #P2
