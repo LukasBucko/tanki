@@ -1,49 +1,66 @@
 import pygame
 import sys
+import random
 import tanki.constants as constants
 from tanki.ui import UI
-from tanki.sprites import Tank
+from tanki.sprites import Tank, Wall
 
 
 class GameEngine:
     def __init__(self):
         pygame.init()
-        # Nastavenie okna
         self.screen = pygame.display.set_mode((constants.WIDTH, constants.HEIGHT))
-        pygame.display.set_caption("Tank Battle Project")
+        pygame.display.set_caption("TANKI")
         self.clock = pygame.time.Clock()
-
         self.ui = UI(self.screen)
 
-        # Skupiny spritov
         self.tanks = pygame.sprite.Group()
-        self.bullets = pygame.sprite.Group()  # Pridaná skupina pre strely
+        self.bullets = pygame.sprite.Group()
+        self.walls = pygame.sprite.Group()
 
-        # Predvolený stav
         self.state = constants.MENU
         self.running = True
+        self.current_map_matrix = None
+
+    def setup_map(self):
+        self.walls.empty()
+        thick = 2
+        ts = constants.TILE_SIZE
+
+        # Výber náhodnej mapy zo zoznamu piatich máp
+        self.current_map_matrix = random.choice(constants.MAPS)
+
+        for r, row in enumerate(self.current_map_matrix):
+            for c, cell in enumerate(row):
+                if cell == 1:
+                    x, y = c * ts, r * ts
+                    # Kreslíme čiary len tam, kde stena susedí s prázdnym priestorom (0)
+                    if r > 0 and self.current_map_matrix[r - 1][c] == 0:
+                        self.walls.add(Wall(x, y, ts, thick))
+                    if r < len(self.current_map_matrix) - 1 and self.current_map_matrix[r + 1][c] == 0:
+                        self.walls.add(Wall(x, y + ts - thick, ts, thick))
+                    if c > 0 and self.current_map_matrix[r][c - 1] == 0:
+                        self.walls.add(Wall(x, y, thick, ts))
+                    if c < len(row) - 1 and self.current_map_matrix[r][c + 1] == 0:
+                        self.walls.add(Wall(x + ts - thick, y, thick, ts))
 
     def start_game(self):
+        """Inicializuje kolo, mapu a tanky s ohľadom na nastavené životy."""
         self.tanks.empty()
-        self.bullets.empty()  # Vyčistíme strely pri novom štarte
+        self.bullets.empty()
+        self.setup_map()
 
-        # Hráč 1 - Pridaný 'shoot': SPACE a odkaz na skupinu striel
-        p1 = Tank(200, 300, constants.GREEN, {
-            'up': pygame.K_w,
-            'down': pygame.K_s,
-            'left': pygame.K_a,
-            'right': pygame.K_d,
-            'shoot': pygame.K_SPACE
-        }, self.bullets, lives=constants.tank_lives)
+        ts = constants.TILE_SIZE
+        # Hráč 1 - Spawn vľavo hore (bezpečná zóna 1,1)
+        p1 = Tank(ts * 1.5, ts * 1.5, constants.GREEN, {
+            'up': pygame.K_w, 'down': pygame.K_s, 'left': pygame.K_a, 'right': pygame.K_d, 'shoot': pygame.K_SPACE
+        }, self.bullets, self.walls, lives=constants.tank_lives)
 
-        # Hráč 2 - Pridaný 'shoot': RETURN (Enter) a odkaz na skupinu striel
-        p2 = Tank(600, 300, constants.RED, {
-            'up': pygame.K_UP,
-            'down': pygame.K_DOWN,
-            'left': pygame.K_LEFT,
-            'right': pygame.K_RIGHT,
+        # Hráč 2 - Spawn vpravo dole (bezpečná zóna 8,5)
+        p2 = Tank(ts * 8.5, ts * 5.5, constants.RED, {
+            'up': pygame.K_UP, 'down': pygame.K_DOWN, 'left': pygame.K_LEFT, 'right': pygame.K_RIGHT,
             'shoot': pygame.K_RETURN
-        }, self.bullets, lives=constants.tank_lives)
+        }, self.bullets, self.walls, lives=constants.tank_lives)
 
         self.tanks.add(p1, p2)
 
@@ -52,7 +69,7 @@ class GameEngine:
             if event.type == pygame.QUIT:
                 self.running = False
 
-            # Logika pre HLAVNÉ MENU
+            # --- Logika pre MENU ---
             if self.state == constants.MENU:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_UP:
@@ -60,16 +77,16 @@ class GameEngine:
                     elif event.key == pygame.K_DOWN:
                         self.ui.selected_index = (self.ui.selected_index + 1) % len(self.ui.menu_options)
                     elif event.key == pygame.K_RETURN:
-                        if self.ui.selected_index == 0:  # ŠTART
+                        if self.ui.selected_index == 0:
                             self.start_game()
                             self.state = constants.PLAYING
-                        elif self.ui.selected_index == 1:  # NASTAVENIA
+                        elif self.ui.selected_index == 1:
                             self.state = constants.SETTINGS
                             self.ui.selected_index = 0
-                        elif self.ui.selected_index == 2:  # KONIEC
+                        elif self.ui.selected_index == 2:
                             self.running = False
 
-            # Logika pre NASTAVENIA
+            # --- Logika pre SETTINGS ---
             elif self.state == constants.SETTINGS:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_UP:
@@ -77,19 +94,12 @@ class GameEngine:
                     elif event.key == pygame.K_DOWN:
                         self.ui.selected_index = (self.ui.selected_index + 1) % 3
 
-                    # Meníme globálne konštanty šípkami vľavo/vpravo
-                    if self.ui.selected_index == 0:
-                        if event.key == pygame.K_RIGHT:
-                            constants.tank_speed = min(5, constants.tank_speed + 1)
-                        if event.key == pygame.K_LEFT:
-                            constants.tank_speed = max(1, constants.tank_speed - 1)
-
-                    elif self.ui.selected_index == 1:
-                        if event.key == pygame.K_RIGHT:
-                            constants.tank_lives = min(5, constants.tank_lives + 1)
-                        if event.key == pygame.K_LEFT:
-                            constants.tank_lives = max(1, constants.tank_lives - 1)
-
+                    if self.ui.selected_index == 0:  # Rýchlosť
+                        if event.key == pygame.K_RIGHT: constants.tank_speed = min(5, constants.tank_speed + 1)
+                        if event.key == pygame.K_LEFT: constants.tank_speed = max(1, constants.tank_speed - 1)
+                    elif self.ui.selected_index == 1:  # Životy
+                        if event.key == pygame.K_RIGHT: constants.tank_lives = min(5, constants.tank_lives + 1)
+                        if event.key == pygame.K_LEFT: constants.tank_lives = max(1, constants.tank_lives - 1)
                     elif event.key == pygame.K_RETURN and self.ui.selected_index == 2:
                         self.state = constants.MENU
                         self.ui.selected_index = 1
@@ -98,7 +108,6 @@ class GameEngine:
         while self.running:
             self.handle_events()
 
-            # Vykresľovanie podľa aktuálneho stavu
             if self.state == constants.MENU:
                 self.ui.draw_main_menu()
 
@@ -110,28 +119,29 @@ class GameEngine:
 
                 # --- AKTUALIZÁCIA ---
                 self.tanks.update()
-                self.bullets.update()  # Aktualizujeme pohyb striel
+                self.bullets.update()
 
                 # --- VYKRESLENIE ---
+                self.walls.draw(self.screen)
+                self.bullets.draw(self.screen)
                 self.tanks.draw(self.screen)
-                self.bullets.draw(self.screen)  # Vykreslíme strely na obrazovku
 
-                # --- ZOBRAZENIE ŽIVOTOV V ROHOCH ---
+                # --- HUD (Životy) ---
                 tanks_list = self.tanks.sprites()
                 if len(tanks_list) >= 2:
-                    p1_lives_surf = self.ui.font_info.render(f"P1 Životy: {tanks_list[0].lives}", True, constants.GREEN)
-                    self.screen.blit(p1_lives_surf, (20, 20))
+                    p1_lives = self.ui.font_info.render(f"P1 HP: {tanks_list[0].lives}", True, constants.GREEN)
+                    self.screen.blit(p1_lives, (20, 20))
+                    p2_lives = self.ui.font_info.render(f"P2 HP: {tanks_list[1].lives}", True, constants.RED)
+                    self.screen.blit(p2_lives, (constants.WIDTH - p2_lives.get_width() - 20, 20))
 
-                    p2_lives_surf = self.ui.font_info.render(f"P2 Životy: {tanks_list[1].lives}", True, constants.RED)
-                    self.screen.blit(p2_lives_surf, (constants.WIDTH - p2_lives_surf.get_width() - 20, 20))
+                # Detekcia konca kola (ak jeden hráč vyhrá)
+                if len(self.tanks) < 2:
+                    pygame.time.delay(1000)
+                    self.start_game()
 
-                # Návrat do menu pomocou ESC
-                keys = pygame.key.get_pressed()
-                if keys[pygame.K_ESCAPE]:
+                # ESC pre návrat do menu
+                if pygame.key.get_pressed()[pygame.K_ESCAPE]:
                     self.state = constants.MENU
-
-                self.ui.draw_text("ESC pre menu", self.ui.font_info, constants.WHITE,
-                                  constants.WIDTH // 2, constants.HEIGHT - 30)
 
             pygame.display.flip()
             self.clock.tick(constants.FPS)
