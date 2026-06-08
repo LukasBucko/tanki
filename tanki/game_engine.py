@@ -19,6 +19,7 @@ class GameEngine:
         self.walls = pygame.sprite.Group()
 
         self.state = constants.MENU
+        self.ip_address = "127.0.0.1"
         self.running = True
         self.current_map_matrix = None
 
@@ -75,10 +76,26 @@ class GameEngine:
                             self.start_game()
                             self.state = constants.PLAYING
                         elif self.ui.selected_index == 1:
-                            self.state = constants.SETTINGS
+                            self.state = constants.CONNECT
                             self.ui.selected_index = 0
                         elif self.ui.selected_index == 2:
+                            self.state = constants.SETTINGS
+                            self.ui.selected_index = 0
+                        elif self.ui.selected_index == 3:
                             self.running = False
+
+            elif self.state == constants.CONNECT:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RETURN:
+                        self.start_game()
+                        self.state = constants.PLAYING
+                    elif event.key == pygame.K_BACKSPACE:
+                        self.ip_address = self.ip_address[:-1]
+                    elif event.key == pygame.K_ESCAPE:
+                        self.state = constants.MENU
+                        self.ui.selected_index = 1
+                    elif event.unicode and event.unicode in "0123456789.":
+                        self.ip_address += event.unicode
 
             elif self.state == constants.SETTINGS:
                 if event.type == pygame.KEYDOWN:
@@ -103,6 +120,9 @@ class GameEngine:
 
             if self.state == constants.MENU:
                 self.ui.draw_main_menu()
+
+            elif self.state == constants.CONNECT:
+                self.ui.draw_connect_menu(self.ip_address)
 
             elif self.state == constants.SETTINGS:
                 self.ui.draw_settings(constants.tank_speed, constants.tank_lives)
