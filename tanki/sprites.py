@@ -57,7 +57,7 @@ class Bullet(pygame.sprite.Sprite):
 
 
 class Tank(pygame.sprite.Sprite):
-    def __init__(self, x, y, color, controls, bullet_group, wall_group, shoot_sound=None, lives=None):
+    def __init__(self, x, y, color, controls, bullet_group, wall_group, shoot_sound=None, lives=None, is_local=True):
         super().__init__()
         self.color = color
         self.lives = lives if lives is not None else constants.tank_lives
@@ -66,6 +66,7 @@ class Tank(pygame.sprite.Sprite):
         self.controls = controls
         self.shoot_sound = shoot_sound
         self.cooldown_tracker = 0
+        self.is_local = is_local
 
         self.original_image = pygame.Surface((44, 44), pygame.SRCALPHA)
         pygame.draw.rect(self.original_image, color, (5, 9, 30, 26), border_radius=4)
@@ -81,6 +82,14 @@ class Tank(pygame.sprite.Sprite):
         self.pos = pygame.math.Vector2(x, y)
         self.angle = 0
 
+    def update_position(self, x, y, angle):
+        self.pos.x = x
+        self.pos.y = y
+        self.angle = angle
+        self.hitbox.center = (x, y)
+        self.image = pygame.transform.rotate(self.original_image, self.angle)
+        self.rect = self.image.get_rect(center=self.pos)
+
     def shoot(self):
         if self.cooldown_tracker == 0:
             # Prehraj zvuk výstrelu
@@ -94,6 +103,11 @@ class Tank(pygame.sprite.Sprite):
             self.cooldown_tracker = constants.SHOOT_COOLDOWN
 
     def update(self):
+        if not self.is_local:
+            if self.cooldown_tracker > 0:
+                self.cooldown_tracker -= 1
+            return
+
         keys = pygame.key.get_pressed()
         if keys[self.controls['left']]: self.angle += 3.5
         if keys[self.controls['right']]: self.angle -= 3.5
