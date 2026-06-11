@@ -8,6 +8,7 @@ class Network:
         self.host = host
         self.port = port
         self.player_id = None
+        self.inbox = []
         self.map_index = None
         self.connected = False
         self.buffer = ""
@@ -39,14 +40,18 @@ class Network:
                     self.player_id = int(line[3:])
                 elif line.startswith("MAP:"):
                     self.map_index = int(line[4:])
+                else:
+                    self.inbox.append(line)
         self.connected = False
-
     def send(self, msg):
         try:
             self.client.sendall((msg + "\n").encode())
         except Exception:
             pass
 
+    def drain_inbox(self):
+        msgs, self.inbox = self.inbox, []
+        return msgs
 
 if __name__ == "__main__":
     import time
