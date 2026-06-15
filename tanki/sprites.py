@@ -83,6 +83,10 @@ class Tank(pygame.sprite.Sprite):
         self.pos = pygame.math.Vector2(x, y)
         self.angle = 0
 
+        # Príznaky pre sieť: kedy tank vystrelil a kde vznikla strela
+        self.just_shot = False
+        self.last_shot_pos = (x, y)
+
     def update_position(self, x, y, angle):
         self.pos.x = x
         self.pos.y = y
@@ -102,6 +106,10 @@ class Tank(pygame.sprite.Sprite):
             new_bullet = Bullet(spawn_pos.x, spawn_pos.y, self.angle, self, self.wall_group)
             self.bullet_group.add(new_bullet)
             self.cooldown_tracker = constants.SHOOT_COOLDOWN
+
+            # Zaznač výstrel, aby ho herný engine mohol poslať po sieti
+            self.last_shot_pos = (spawn_pos.x, spawn_pos.y)
+            self.just_shot = True
 
     def update(self):
         if not self.is_local:

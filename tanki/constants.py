@@ -3,7 +3,6 @@ import pygame
 WIDTH, HEIGHT = 800, 600
 FPS = 60
 
-# Farby Tank Trouble
 GRAY = (230, 230, 230)
 WALL_COLOR = (80, 80, 80)
 GREEN = (80, 200, 80)
@@ -16,8 +15,8 @@ MENU, CONNECT, SETTINGS, PLAYING = "MENU", "CONNECT", "SETTINGS", "PLAYING"
 
 tank_speed = 2
 tank_lives = 1
-BULLET_SPEED = 400
-SHOOT_COOLDOWN = 0
+BULLET_SPEED = 4
+SHOOT_COOLDOWN = 10
 TILE_SIZE = 80
 
 MAPS = [
