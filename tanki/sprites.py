@@ -57,7 +57,7 @@ class Bullet(pygame.sprite.Sprite):
 
 
 class Tank(pygame.sprite.Sprite):
-    def __init__(self, x, y, color, controls, bullet_group, wall_group, shoot_sound=None, lives=None, is_local=True):
+    def __init__(self, x, y, color, controls, bullet_group, wall_group, shoot_sound=None, lives=None, is_local=True, player_id=None):
         super().__init__()
         self.color = color
         self.lives = lives if lives is not None else constants.tank_lives
@@ -67,6 +67,7 @@ class Tank(pygame.sprite.Sprite):
         self.shoot_sound = shoot_sound
         self.cooldown_tracker = 0
         self.is_local = is_local
+        self.player_id = player_id
 
         self.original_image = pygame.Surface((44, 44), pygame.SRCALPHA)
         pygame.draw.rect(self.original_image, color, (5, 9, 30, 26), border_radius=4)

@@ -51,12 +51,12 @@ class GameEngine:
         ts = constants.TILE_SIZE
         p1 = Tank(ts * 1.5, ts * 1.5, constants.GREEN, {
             'up': pygame.K_w, 'down': pygame.K_s, 'left': pygame.K_a, 'right': pygame.K_d, 'shoot': pygame.K_SPACE
-        }, self.bullets, self.walls, lives=constants.tank_lives)
+        }, self.bullets, self.walls, lives=constants.tank_lives, player_id=1)
 
         p2 = Tank(ts * 8.5, ts * 5.5, constants.RED, {
             'up': pygame.K_UP, 'down': pygame.K_DOWN, 'left': pygame.K_LEFT, 'right': pygame.K_RIGHT,
             'shoot': pygame.K_RSHIFT
-        }, self.bullets, self.walls, lives=constants.tank_lives)
+        }, self.bullets, self.walls, lives=constants.tank_lives, player_id=2)
 
         self.tanks.add(p1, p2)
 
@@ -153,26 +153,20 @@ class GameEngine:
                 self.tanks.draw(self.screen)
 
                 # --- HUD (Životy) ---
-                tanks_list = self.tanks.sprites()
-                # Bezpečné získanie tankov podľa farby
-                p1 = next((t for t in tanks_list if t.color == constants.GREEN), None)
-                p2 = next((t for t in tanks_list if t.color == constants.RED), None)
-
-                if p1:
-                    p1_lives = self.ui.font_info.render(f"P1 HP: {p1.lives}", True, constants.GREEN)
-                    self.screen.blit(p1_lives, (20, 20))
-                if p2:
-                    p2_lives = self.ui.font_info.render(f"P2 HP: {p2.lives}", True, constants.RED)
-                    self.screen.blit(p2_lives, (constants.WIDTH - p2_lives.get_width() - 20, 20))
+                tanks_list = sorted(self.tanks.sprites(), key=lambda t: (t.player_id is None, t.player_id if t.player_id is not None else 0))
+                for index, tank in enumerate(tanks_list):
+                    player_label = f"Hráč {tank.player_id} HP: {tank.lives}" if tank.player_id is not None else f"HP: {tank.lives}"
+                    label_surface = self.ui.font_info.render(player_label, True, tank.color)
+                    self.screen.blit(label_surface, (20, 20 + index * 30))
 
                 # Detekcia konca kola
-                if len(self.tanks) < 2:
-                    # Vykreslenie výsledku predtým, než hra zamrzne na delay
-                    msg = "REMIZA!"
-                    if p1:
-                        msg = "P1 VYHRAL!"
-                    elif p2:
-                        msg = "P2 VYHRAL!"
+                alive_tanks = self.tanks.sprites()
+                if len(alive_tanks) < 2:
+                    if len(alive_tanks) == 1:
+                        winner = alive_tanks[0]
+                        msg = f"Hráč {winner.player_id} VYHRAL!" if winner.player_id is not None else "VYHRAL!"
+                    else:
+                        msg = "REMÍZA!"
 
                     self.ui.draw_text(msg, self.ui.font_title, constants.YELLOW, constants.WIDTH // 2,
                                       constants.HEIGHT // 2)
